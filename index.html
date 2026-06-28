@@ -46,6 +46,42 @@
 <div id="map" style="height:500px; margin-top:20px;"></div>
 <div id="workshop-list" style="margin-top:20px;"></div>
 
+<!-- ⭐ ADMIN PANEL (YOU WERE MISSING THIS) ⭐ -->
+<hr>
+<h3>Workshop Editor</h3>
+
+<input id="w-id" type="hidden">
+
+<label>Name:</label><br>
+<input id="w-name"><br><br>
+
+<label>Latitude:</label><br>
+<input id="w-lat"><br><br>
+
+<label>Longitude:</label><br>
+<input id="w-lng"><br><br>
+
+<label>Main Phone:</label><br>
+<input id="w-phone-main"><br><br>
+
+<label>Mobile Phone:</label><br>
+<input id="w-phone-mobile"><br><br>
+
+<label>Out of Hours:</label><br>
+<input id="w-phone-out"><br><br>
+
+<label>Email:</label><br>
+<input id="w-email"><br><br>
+
+<button onclick="saveWorkshop()">Save Workshop</button>
+<button onclick="resetToDefaults()">Reset All Workshops</button>
+
+<hr>
+
+<h3>Bulk Import</h3>
+<textarea id="bulk-input" style="width:100%;height:120px;" placeholder="name,lat,lng,phoneMain,phoneMobile,phoneOutHours,email"></textarea><br>
+<button onclick="bulkImport()">Bulk Import</button>
+
 <!-- LOGIN POPUP -->
 <div id="login-overlay">
   <div id="login-box">
