@@ -98,9 +98,6 @@ import {
   getAuth, signInWithEmailAndPassword, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-/* -------------------------------
-   FIXED FIREBASE CONFIG
---------------------------------*/
 const firebaseConfig = {
   apiKey: "AIzaSyAkm-NcybEuigI1PIR0UNk7aeNKLasQEZw",
   authDomain: "hgv-workshop-finder.firebaseapp.com",
@@ -123,16 +120,10 @@ let workshopMarkers = [];
 let breakdownMarker = null;
 let userIsAdmin = false;
 
-/* -------------------------------
-   AUTH LISTENER
---------------------------------*/
 onAuthStateChanged(auth, (user) => {
   userIsAdmin = !!(user && user.email === ADMIN_EMAIL);
 });
 
-/* -------------------------------
-   LOGIN POPUP
---------------------------------*/
 function requireAdmin() {
   if (!userIsAdmin) {
     document.getElementById("login-overlay").style.display = "flex";
@@ -153,9 +144,6 @@ window.performLogin = function() {
     .catch(() => alert("Login failed."));
 };
 
-/* -------------------------------
-   REALTIME WORKSHOP SYNC
---------------------------------*/
 const workshopsRef = ref(db, "workshops");
 
 onValue(workshopsRef, (snapshot) => {
@@ -164,9 +152,6 @@ onValue(workshopsRef, (snapshot) => {
   refreshWorkshopMarkers();
 });
 
-/* -------------------------------
-   MAP INITIALISATION
---------------------------------*/
 window.initMap = function() {
   map = new google.maps.Map(document.getElementById("map"), {
     center: { lat: 54.5, lng: -3 },
@@ -177,9 +162,6 @@ window.initMap = function() {
   refreshWorkshopList();
 };
 
-/* -------------------------------
-   RENDER ALL MARKERS
---------------------------------*/
 function refreshWorkshopMarkers() {
   workshopMarkers.forEach(m => m.setMap(null));
   workshopMarkers = [];
@@ -207,9 +189,6 @@ function refreshWorkshopMarkers() {
   });
 }
 
-/* -------------------------------
-   RENDER ALL LIST ITEMS
---------------------------------*/
 function refreshWorkshopList() {
   const container = document.getElementById("workshop-list");
   if (!container) return;
@@ -228,9 +207,6 @@ function refreshWorkshopList() {
   });
 }
 
-/* -------------------------------
-   WORKSHOP ACTIONS
---------------------------------*/
 window.zoomToWorkshop = function(id) {
   const w = workshops[id];
   if (!w) return;
@@ -337,9 +313,6 @@ function clearWorkshopForm() {
   document.getElementById("w-email").value = "";
 }
 
-/* -------------------------------
-   POSTCODE SEARCH
---------------------------------*/
 window.findWorkshops = function() {
   const postcode = document.getElementById("postcode").value.trim();
   if (!postcode) {
@@ -347,7 +320,7 @@ window.findWorkshops = function() {
     return;
   }
 
-  fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(postcode)}&region=uk&key=AIzaSyB6p5E2vQ-PzafSR7wriDUZRLI1dgtN5o8`)
+  fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(postcode)}&region=uk&key=AIzaSyAkm-NcybEuigI1PIR0UNk7aeNKLasQEZw`)
     .then(res => res.json())
     .then(data => {
       if (!data.results || !data.results.length) {
@@ -409,10 +382,9 @@ window.addEventListener("load", () => {
 });
 </script>
 
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB6p5E2vQ-PzafSR7wriDUZRLI1dgtN5o8" async defer></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAkm-NcybEuigI1PIR0UNk7aeNKLasQEZw" async defer></script>
 
 </body>
 </html>
-
 
 
