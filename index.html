@@ -75,7 +75,7 @@ let workshops = [];
 let nextId = 4;
 
 let map;
-let markers = [];
+let workshopMarkers = [];
 let breakdownMarker = null;
 
 function loadWorkshops() {
@@ -105,18 +105,18 @@ function initMap() {
     zoom: 6,
   });
 
-  renderWorkshopMarkers();
-  renderWorkshopList();
+  // Start with NO workshops shown
+  renderWorkshopMarkers([]);
+  renderWorkshopList([]);
 }
 
-function clearMarkers() {
-  markers.forEach(m => m.setMap(null));
-  markers = [];
+function clearWorkshopMarkers() {
+  workshopMarkers.forEach(m => m.setMap(null));
+  workshopMarkers = [];
 }
 
-function renderWorkshopMarkers(sortedList = null) {
-  clearMarkers();
-  const list = sortedList || workshops;
+function renderWorkshopMarkers(list) {
+  clearWorkshopMarkers();
 
   list.forEach(w => {
     const marker = new google.maps.Marker({
@@ -125,14 +125,13 @@ function renderWorkshopMarkers(sortedList = null) {
       title: w.name,
       icon: "http://maps.google.com/mapfiles/ms/icons/green-dot.png"
     });
-    markers.push(marker);
+    workshopMarkers.push(marker);
   });
 }
 
-function renderWorkshopList(sortedList = null) {
+function renderWorkshopList(list) {
   const container = document.getElementById("workshop-list");
   container.innerHTML = "";
-  const list = sortedList || workshops;
 
   list.forEach(w => {
     const div = document.createElement("div");
@@ -195,16 +194,12 @@ function saveWorkshop() {
 
   clearWorkshopForm();
   saveWorkshopsToStorage();
-  renderWorkshopMarkers();
-  renderWorkshopList();
 }
 
 function deleteWorkshop(id) {
   if (!confirm("Delete this workshop?")) return;
   workshops = workshops.filter(w => w.id !== id);
   saveWorkshopsToStorage();
-  renderWorkshopMarkers();
-  renderWorkshopList();
 }
 
 function resetToDefaults() {
@@ -212,8 +207,6 @@ function resetToDefaults() {
   workshops = [...DEFAULT_WORKSHOPS];
   nextId = 4;
   saveWorkshopsToStorage();
-  renderWorkshopMarkers();
-  renderWorkshopList();
 }
 
 function haversine(lat1, lon1, lat2, lon2) {
@@ -236,7 +229,6 @@ function findWorkshops() {
     return;
   }
 
-  // NEW API KEY HERE
   fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(postcode)}&region=uk&key=AIzaSyB6p5E2vQ-PzafSR7wriDUZRLI1dgtN5o8`)
     .then(res => res.json())
     .then(data => {
@@ -273,10 +265,8 @@ function findWorkshops() {
 }
 </script>
 
-<!-- NEW API KEY HERE -->
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB6p5E2vQ-PzafSR7wriDUZRLI1dgtN5o8&callback=initMap" async defer></script>
 
 </body>
 </html>
-
 
