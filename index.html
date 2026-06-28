@@ -128,7 +128,7 @@ window.initMap = function() {
 };
 
 /* -------------------------------
-   RENDER MARKERS
+   RENDER ALL MARKERS
 --------------------------------*/
 function refreshWorkshopMarkers() {
   workshopMarkers.forEach(m => m.setMap(null));
@@ -158,7 +158,7 @@ function refreshWorkshopMarkers() {
 }
 
 /* -------------------------------
-   RENDER LIST
+   RENDER ALL LIST ITEMS
 --------------------------------*/
 function refreshWorkshopList() {
   const container = document.getElementById("workshop-list");
@@ -172,6 +172,56 @@ function refreshWorkshopList() {
       <button class="btn-small" onclick="zoomToWorkshop('${id}')">Zoom</button>
       <button class="btn-small" onclick="editWorkshop('${id}')">Edit</button>
       <button class="btn-small" onclick="deleteWorkshop('${id}')">Delete</button>
+    `;
+    container.appendChild(div);
+  });
+}
+
+/* -------------------------------
+   RENDER SORTED MARKERS (SEARCH)
+--------------------------------*/
+function renderWorkshopMarkers(list) {
+  workshopMarkers.forEach(m => m.setMap(null));
+  workshopMarkers = [];
+
+  list.forEach(w => {
+    const marker = new google.maps.Marker({
+      position: { lat: w.lat, lng: w.lng },
+      map,
+      title: w.name,
+      icon: "http://maps.google.com/mapfiles/ms/icons/green-dot.png"
+    });
+
+    const info = new google.maps.InfoWindow({
+      content: `
+        <strong>${w.name}</strong><br><br>
+        <b>Main:</b> ${w.phoneMain || "N/A"}<br>
+        <b>Mobile:</b> ${w.phoneMobile || "N/A"}<br>
+        <b>Out of hours:</b> ${w.phoneOutHours || "N/A"}<br>
+        <b>Email:</b> ${w.email || "N/A"}<br>
+      `
+    });
+
+    marker.addListener("click", () => info.open(map, marker));
+    workshopMarkers.push(marker);
+  });
+}
+
+/* -------------------------------
+   RENDER SORTED LIST (SEARCH)
+--------------------------------*/
+function renderWorkshopList(list) {
+  const container = document.getElementById("workshop-list");
+  container.innerHTML = "";
+
+  list.forEach(w => {
+    const div = document.createElement("div");
+    div.innerHTML = `
+      <strong>${w.name}</strong><br>
+      Distance: ${w.distanceKm.toFixed(1)} km<br>
+      <button class="btn-small" onclick="zoomToWorkshop('${w.id}')">Zoom</button>
+      <button class="btn-small" onclick="editWorkshop('${w.id}')">Edit</button>
+      <button class="btn-small" onclick="deleteWorkshop('${w.id}')">Delete</button>
     `;
     container.appendChild(div);
   });
@@ -276,7 +326,7 @@ window.resetToDefaults = function() {
 };
 
 /* -------------------------------
-   CLEAR FORM (MISSING FUNCTION FIXED)
+   CLEAR FORM
 --------------------------------*/
 function clearWorkshopForm() {
   document.getElementById("w-id").value = "";
@@ -350,4 +400,5 @@ function haversine(lat1, lon1, lat2, lon2) {
 </script>
 
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB6p5E2vQ-PzafSR7wriDUZRLI1dgtN5o8&callback=initMap" async defer></script>
+
 
