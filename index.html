@@ -276,6 +276,20 @@ window.resetToDefaults = function() {
 };
 
 /* -------------------------------
+   CLEAR FORM (MISSING FUNCTION FIXED)
+--------------------------------*/
+function clearWorkshopForm() {
+  document.getElementById("w-id").value = "";
+  document.getElementById("w-name").value = "";
+  document.getElementById("w-lat").value = "";
+  document.getElementById("w-lng").value = "";
+  document.getElementById("w-phone-main").value = "";
+  document.getElementById("w-phone-mobile").value = "";
+  document.getElementById("w-phone-out").value = "";
+  document.getElementById("w-email").value = "";
+}
+
+/* -------------------------------
    POSTCODE SEARCH
 --------------------------------*/
 window.findWorkshops = function() {
@@ -336,3 +350,4 @@ function haversine(lat1, lon1, lat2, lon2) {
 </script>
 
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB6p5E2vQ-PzafSR7wriDUZRLI1dgtN5o8&callback=initMap" async defer></script>
+
