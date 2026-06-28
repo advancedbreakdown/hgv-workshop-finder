@@ -42,11 +42,9 @@
 <input id="postcode" placeholder="Enter postcode">
 <button onclick="findWorkshops()">Search</button>
 
-<!-- ⭐ REQUIRED MAP + LIST CONTAINERS ⭐ -->
 <div id="map" style="height:500px; margin-top:20px;"></div>
 <div id="workshop-list" style="margin-top:20px;"></div>
 
-<!-- ⭐ ADMIN PANEL (YOU WERE MISSING THIS) ⭐ -->
 <hr>
 <h3>Workshop Editor</h3>
 
@@ -82,7 +80,6 @@
 <textarea id="bulk-input" style="width:100%;height:120px;" placeholder="name,lat,lng,phoneMain,phoneMobile,phoneOutHours,email"></textarea><br>
 <button onclick="bulkImport()">Bulk Import</button>
 
-<!-- LOGIN POPUP -->
 <div id="login-overlay">
   <div id="login-box">
     <h3>Admin Login Required</h3>
@@ -93,9 +90,6 @@
 </div>
 
 <script type="module">
-/* -------------------------------
-   FIREBASE INITIALISATION
---------------------------------*/
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { 
   getDatabase, ref, set, push, onValue, update, remove 
@@ -104,12 +98,15 @@ import {
   getAuth, signInWithEmailAndPassword, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
+/* -------------------------------
+   FIXED FIREBASE CONFIG
+--------------------------------*/
 const firebaseConfig = {
   apiKey: "AIzaSyAkm-NcybEuigI1PIR0UNk7aeNKLasQEZw",
   authDomain: "hgv-workshop-finder.firebaseapp.com",
   databaseURL: "https://hgv-workshop-finder-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "hgv-workshop-finder",
-  storageBucket: "hgv-workshop-finder.firebasestorage.app",
+  storageBucket: "hgv-workshop-finder.appspot.com",
   messagingSenderId: "540661085613",
   appId: "1:540661085613:web:199992f2ad1c4f5cb29d24"
 };
@@ -192,7 +189,7 @@ function refreshWorkshopMarkers() {
       position: { lat: w.lat, lng: w.lng },
       map,
       title: w.name,
-      icon: "http://maps.google.com/mapfiles/ms/icons/green-dot.png"
+      icon: "https://maps.google.com/mapfiles/ms/icons/green-dot.png"
     });
 
     const info = new google.maps.InfoWindow({
@@ -226,57 +223,6 @@ function refreshWorkshopList() {
       <button onclick="zoomToWorkshop('${id}')">Zoom</button>
       <button onclick="editWorkshop('${id}')">Edit</button>
       <button onclick="deleteWorkshop('${id}')">Delete</button>
-    `;
-    container.appendChild(div);
-  });
-}
-
-/* -------------------------------
-   RENDER SORTED MARKERS (SEARCH)
---------------------------------*/
-function renderWorkshopMarkers(list) {
-  workshopMarkers.forEach(m => m.setMap(null));
-  workshopMarkers = [];
-
-  list.forEach(w => {
-    const marker = new google.maps.Marker({
-      position: { lat: w.lat, lng: w.lng },
-      map,
-      title: w.name,
-      icon: "http://maps.google.com/mapfiles/ms/icons/green-dot.png"
-    });
-
-    const info = new google.maps.InfoWindow({
-      content: `
-        <strong>${w.name}</strong><br><br>
-        <b>Main:</b> ${w.phoneMain || "N/A"}<br>
-        <b>Mobile:</b> ${w.phoneMobile || "N/A"}<br>
-        <b>Out of hours:</b> ${w.phoneOutHours || "N/A"}<br>
-        <b>Email:</b> ${w.email || "N/A"}<br>
-      `
-    });
-
-    marker.addListener("click", () => info.open(map, marker));
-    workshopMarkers.push(marker);
-  });
-}
-
-/* -------------------------------
-   RENDER SORTED LIST (SEARCH)
---------------------------------*/
-function renderWorkshopList(list) {
-  const container = document.getElementById("workshop-list");
-  if (!container) return;
-  container.innerHTML = "";
-
-  list.forEach(w => {
-    const div = document.createElement("div");
-    div.innerHTML = `
-      <strong>${w.name}</strong><br>
-      Distance: ${w.distanceKm.toFixed(1)} km<br>
-      <button onclick="zoomToWorkshop('${w.id}')">Zoom</button>
-      <button onclick="editWorkshop('${w.id}')">Edit</button>
-      <button onclick="deleteWorkshop('${w.id}')">Delete</button>
     `;
     container.appendChild(div);
   });
@@ -380,9 +326,6 @@ window.resetToDefaults = function() {
   set(workshopsRef, {});
 };
 
-/* -------------------------------
-   CLEAR FORM
---------------------------------*/
 function clearWorkshopForm() {
   document.getElementById("w-id").value = "";
   document.getElementById("w-name").value = "";
@@ -419,7 +362,7 @@ window.findWorkshops = function() {
         position: loc,
         map,
         title: "Breakdown location",
-        icon: "http://maps.google.com/mapfiles/ms/icons/red-dot.png"
+        icon: "https://maps.google.com/mapfiles/ms/icons/red-dot.png"
       });
 
       map.setCenter(loc);
@@ -452,9 +395,6 @@ function haversine(lat1, lon1, lat2, lon2) {
   return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 }
 
-/* -------------------------------
-   LOAD MAP AFTER PAGE LOAD
---------------------------------*/
 window.addEventListener("load", () => {
   if (window.google && window.google.maps) {
     initMap();
@@ -469,7 +409,6 @@ window.addEventListener("load", () => {
 });
 </script>
 
-<!-- LOAD GOOGLE MAPS WITHOUT CALLBACK -->
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB6p5E2vQ-PzafSR7wriDUZRLI1dgtN5o8" async defer></script>
 
 </body>
