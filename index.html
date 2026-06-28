@@ -1,130 +1,140 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>HGV Workshop Finder</title>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    body { margin: 0; font-family: sans-serif; }
-    #map { height: 100vh; width: 100%; }
+<!-- LOGIN POPUP + DIM BACKGROUND -->
+<style>
+  #login-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.6);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+  }
+  #login-box {
+    background: white;
+    padding: 20px;
+    width: 300px;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.4);
+    text-align: center;
+  }
+  #login-box input {
+    width: 100%;
+    padding: 8px;
+    margin-top: 8px;
+  }
+  #login-box button {
+    width: 100%;
+    padding: 10px;
+    margin-top: 12px;
+  }
+</style>
 
-    #panel {
-      position: absolute; top: 10px; left: 10px; z-index: 1000;
-      background: #fff; padding: 10px; border-radius: 10px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.25); width: 320px;
-      max-height: 90vh; overflow-y: auto; font-size: 14px;
-    }
-
-    @media (max-width: 768px) {
-      #panel { position: static; width: 100%; box-shadow: none; border-radius: 0; }
-      #map { height: calc(100vh - 260px); }
-    }
-
-    #panel input, #panel button, #panel textarea {
-      width: 100%; margin-top: 4px; margin-bottom: 6px; padding: 6px;
-      box-sizing: border-box; font-size: 14px;
-    }
-
-    .btn-small {
-      width: auto; padding: 4px 6px; font-size: 12px;
-      margin-right: 4px; margin-top: 4px;
-    }
-
-    #workshop-list div {
-      margin-bottom: 6px; border-bottom: 1px solid #eee; padding-bottom: 6px;
-    }
-  </style>
-</head>
-<body>
-
-<div id="panel">
-  <h2>HGV Workshop Finder</h2>
-
-  <label>Breakdown postcode:</label>
-  <input id="postcode" type="text" placeholder="e.g. LU7 3PQ">
-  <button onclick="findWorkshops()">Search (20 nearest)</button>
-
-  <hr>
-
-  <label>Add / edit workshop</label>
-  <input id="w-id" type="hidden">
-  <input id="w-name" type="text" placeholder="Workshop name">
-  <input id="w-lat" type="text" placeholder="Latitude">
-  <input id="w-lng" type="text" placeholder="Longitude">
-
-  <!-- CONTACT FIELDS -->
-  <input id="w-phone-main" type="text" placeholder="Main phone">
-  <input id="w-phone-mobile" type="text" placeholder="Mobile phone">
-  <input id="w-phone-out" type="text" placeholder="Out of hours phone">
-  <input id="w-email" type="text" placeholder="Email address">
-
-  <button onclick="saveWorkshop()">Save workshop</button>
-  <button onclick="clearWorkshopForm()">Clear form</button>
-
-  <hr>
-
-  <strong>Bulk import workshops</strong>
-  <textarea id="bulk-input" placeholder="Name,lat,lng,main,mobile,out,email per line"></textarea>
-  <button onclick="bulkImport()">Import</button>
-
-  <hr>
-
-  <strong>Current workshops</strong>
-  <div id="workshop-list"></div>
-
-  <button onclick="resetToDefaults()">Reset to default list</button>
+<div id="login-overlay">
+  <div id="login-box">
+    <h3>Admin Login Required</h3>
+    <input id="login-email" type="email" placeholder="Email">
+    <input id="login-pass" type="password" placeholder="Password">
+    <button onclick="performLogin()">Login</button>
+  </div>
 </div>
 
-<div id="map"></div>
+<script type="module">
+/* -------------------------------
+   FIREBASE INITIALISATION
+--------------------------------*/
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { 
+  getDatabase, ref, set, push, onValue, update, remove 
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+import {
+  getAuth, signInWithEmailAndPassword, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-<script>
-let workshops = [];
-let nextId = 1;
+const firebaseConfig = {
+  apiKey: "AIzaSyAkm-NcybEuigI1PIR0UNk7aeNKLasQEZw",
+  authDomain: "hgv-workshop-finder.firebaseapp.com",
+  databaseURL: "https://hgv-workshop-finder-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "hgv-workshop-finder",
+  storageBucket: "hgv-workshop-finder.firebasestorage.app",
+  messagingSenderId: "540661085613",
+  appId: "1:540661085613:web:199992f2ad1c4f5cb29d24"
+};
 
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
+
+const ADMIN_EMAIL = "breakdown@advancedbreakdownservicesuk.co.uk";
+
+let workshops = {};
 let map;
 let workshopMarkers = [];
 let breakdownMarker = null;
+let userIsAdmin = false;
 
-function loadWorkshops() {
-  const stored = localStorage.getItem("hgv_workshops");
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed)) {
-        workshops = parsed;
-        nextId = workshops.length ? Math.max(...workshops.map(w => w.id)) + 1 : 1;
-        return;
-      }
-    } catch (e) {}
+/* -------------------------------
+   AUTH LISTENER
+--------------------------------*/
+onAuthStateChanged(auth, (user) => {
+  userIsAdmin = !!(user && user.email === ADMIN_EMAIL);
+});
+
+/* -------------------------------
+   LOGIN POPUP
+--------------------------------*/
+function requireAdmin() {
+  if (!userIsAdmin) {
+    document.getElementById("login-overlay").style.display = "flex";
+    return false;
   }
-  workshops = [];
+  return true;
 }
 
-function saveWorkshopsToStorage() {
-  localStorage.setItem("hgv_workshops", JSON.stringify(workshops));
-}
+window.performLogin = function() {
+  const email = document.getElementById("login-email").value.trim();
+  const pass = document.getElementById("login-pass").value.trim();
 
-function initMap() {
-  loadWorkshops();
+  signInWithEmailAndPassword(auth, email, pass)
+    .then(() => {
+      document.getElementById("login-overlay").style.display = "none";
+      alert("Logged in as admin.");
+    })
+    .catch(() => alert("Login failed."));
+};
 
+/* -------------------------------
+   REALTIME WORKSHOP SYNC
+--------------------------------*/
+const workshopsRef = ref(db, "workshops");
+
+onValue(workshopsRef, (snapshot) => {
+  workshops = snapshot.val() || {};
+  refreshWorkshopList();
+  refreshWorkshopMarkers();
+});
+
+/* -------------------------------
+   MAP INITIALISATION
+--------------------------------*/
+window.initMap = function() {
   map = new google.maps.Map(document.getElementById("map"), {
     center: { lat: 54.5, lng: -3 },
     zoom: 6,
   });
 
-  renderWorkshopMarkers([]);
-  renderWorkshopList([]);
-}
+  refreshWorkshopMarkers();
+  refreshWorkshopList();
+};
 
-function clearWorkshopMarkers() {
+/* -------------------------------
+   RENDER MARKERS
+--------------------------------*/
+function refreshWorkshopMarkers() {
   workshopMarkers.forEach(m => m.setMap(null));
   workshopMarkers = [];
-}
 
-function renderWorkshopMarkers(list) {
-  clearWorkshopMarkers();
-
-  list.forEach(w => {
+  Object.entries(workshops).forEach(([id, w]) => {
     const marker = new google.maps.Marker({
       position: { lat: w.lat, lng: w.lng },
       map,
@@ -143,67 +153,63 @@ function renderWorkshopMarkers(list) {
     });
 
     marker.addListener("click", () => info.open(map, marker));
-
     workshopMarkers.push(marker);
   });
 }
 
-function renderWorkshopList(list) {
+/* -------------------------------
+   RENDER LIST
+--------------------------------*/
+function refreshWorkshopList() {
   const container = document.getElementById("workshop-list");
   container.innerHTML = "";
 
-  list.forEach(w => {
+  Object.entries(workshops).forEach(([id, w]) => {
     const div = document.createElement("div");
     div.innerHTML = `
       <strong>${w.name}</strong><br>
       Lat: ${w.lat}, Lng: ${w.lng}<br>
-      <button class="btn-small" onclick="zoomToWorkshop(${w.id})">Zoom</button>
-      <button class="btn-small" onclick="editWorkshop(${w.id})">Edit</button>
-      <button class="btn-small" onclick="deleteWorkshop(${w.id})">Delete</button>
+      <button class="btn-small" onclick="zoomToWorkshop('${id}')">Zoom</button>
+      <button class="btn-small" onclick="editWorkshop('${id}')">Edit</button>
+      <button class="btn-small" onclick="deleteWorkshop('${id}')">Delete</button>
     `;
     container.appendChild(div);
   });
 }
 
-function zoomToWorkshop(id) {
-  const w = workshops.find(x => x.id === id);
+/* -------------------------------
+   WORKSHOP ACTIONS
+--------------------------------*/
+window.zoomToWorkshop = function(id) {
+  const w = workshops[id];
   if (!w) return;
   map.setCenter({ lat: w.lat, lng: w.lng });
   map.setZoom(15);
-}
+};
 
-function editWorkshop(id) {
-  const w = workshops.find(x => x.id === id);
+window.editWorkshop = function(id) {
+  if (!requireAdmin()) return;
+
+  const w = workshops[id];
   if (!w) return;
 
-  document.getElementById("w-id").value = w.id;
+  document.getElementById("w-id").value = id;
   document.getElementById("w-name").value = w.name;
   document.getElementById("w-lat").value = w.lat;
   document.getElementById("w-lng").value = w.lng;
-
   document.getElementById("w-phone-main").value = w.phoneMain || "";
   document.getElementById("w-phone-mobile").value = w.phoneMobile || "";
   document.getElementById("w-phone-out").value = w.phoneOutHours || "";
   document.getElementById("w-email").value = w.email || "";
-}
+};
 
-function clearWorkshopForm() {
-  document.getElementById("w-id").value = "";
-  document.getElementById("w-name").value = "";
-  document.getElementById("w-lat").value = "";
-  document.getElementById("w-lng").value = "";
-  document.getElementById("w-phone-main").value = "";
-  document.getElementById("w-phone-mobile").value = "";
-  document.getElementById("w-phone-out").value = "";
-  document.getElementById("w-email").value = "";
-}
+window.saveWorkshop = function() {
+  if (!requireAdmin()) return;
 
-function saveWorkshop() {
-  const idVal = document.getElementById("w-id").value.trim();
+  const id = document.getElementById("w-id").value.trim();
   const name = document.getElementById("w-name").value.trim();
   const lat = parseFloat(document.getElementById("w-lat").value.trim());
   const lng = parseFloat(document.getElementById("w-lng").value.trim());
-
   const phoneMain = document.getElementById("w-phone-main").value.trim();
   const phoneMobile = document.getElementById("w-phone-mobile").value.trim();
   const phoneOut = document.getElementById("w-phone-out").value.trim();
@@ -214,52 +220,27 @@ function saveWorkshop() {
     return;
   }
 
-  if (idVal) {
-    const id = parseInt(idVal, 10);
-    const idx = workshops.findIndex(w => w.id === id);
-    if (idx !== -1) {
-      workshops[idx] = {
-        ...workshops[idx],
-        name,
-        lat,
-        lng,
-        phoneMain,
-        phoneMobile,
-        phoneOutHours: phoneOut,
-        email
-      };
-    }
+  const data = { name, lat, lng, phoneMain, phoneMobile, phoneOutHours: phoneOut, email };
+
+  if (id) {
+    update(ref(db, "workshops/" + id), data);
   } else {
-    workshops.push({
-      id: nextId++,
-      name,
-      lat,
-      lng,
-      phoneMain,
-      phoneMobile,
-      phoneOutHours: phoneOut,
-      email
-    });
+    const newRef = push(workshopsRef);
+    set(newRef, data);
   }
 
   clearWorkshopForm();
-  saveWorkshopsToStorage();
-}
+};
 
-function deleteWorkshop(id) {
+window.deleteWorkshop = function(id) {
+  if (!requireAdmin()) return;
   if (!confirm("Delete this workshop?")) return;
-  workshops = workshops.filter(w => w.id !== id);
-  saveWorkshopsToStorage();
-}
+  remove(ref(db, "workshops/" + id));
+};
 
-function resetToDefaults() {
-  if (!confirm("Reset to default workshop list?")) return;
-  workshops = [];
-  nextId = 1;
-  saveWorkshopsToStorage();
-}
+window.bulkImport = function() {
+  if (!requireAdmin()) return;
 
-function bulkImport() {
   const text = document.getElementById("bulk-input").value.trim();
   if (!text) {
     alert("Paste some workshop data first.");
@@ -267,52 +248,37 @@ function bulkImport() {
   }
 
   const lines = text.split("\n");
-
   lines.forEach(line => {
-    const parts = line.split(",");
-    if (parts.length < 3) return;
+    const p = line.split(",");
+    if (p.length < 3) return;
 
-    const name = parts[0].trim();
-    const lat = parseFloat(parts[1].trim());
-    const lng = parseFloat(parts[2].trim());
+    const data = {
+      name: p[0].trim(),
+      lat: parseFloat(p[1]),
+      lng: parseFloat(p[2]),
+      phoneMain: p[3] || "",
+      phoneMobile: p[4] || "",
+      phoneOutHours: p[5] || "",
+      email: p[6] || ""
+    };
 
-    const phoneMain = parts[3] ? parts[3].trim() : "";
-    const phoneMobile = parts[4] ? parts[4].trim() : "";
-    const phoneOut = parts[5] ? parts[5].trim() : "";
-    const email = parts[6] ? parts[6].trim() : "";
-
-    if (!name || isNaN(lat) || isNaN(lng)) return;
-
-    workshops.push({
-      id: nextId++,
-      name,
-      lat,
-      lng,
-      phoneMain,
-      phoneMobile,
-      phoneOutHours: phoneOut,
-      email
-    });
+    const newRef = push(workshopsRef);
+    set(newRef, data);
   });
 
-  saveWorkshopsToStorage();
   alert("Bulk import complete.");
-}
+};
 
-function haversine(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lat2 - lon1) * Math.PI / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1 * Math.PI / 180) *
-    Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
+window.resetToDefaults = function() {
+  if (!requireAdmin()) return;
+  if (!confirm("Reset ALL workshops?")) return;
+  set(workshopsRef, {});
+};
 
-function findWorkshops() {
+/* -------------------------------
+   POSTCODE SEARCH
+--------------------------------*/
+window.findWorkshops = function() {
   const postcode = document.getElementById("postcode").value.trim();
   if (!postcode) {
     alert("Enter a postcode.");
@@ -340,8 +306,9 @@ function findWorkshops() {
       map.setCenter(loc);
       map.setZoom(11);
 
-      let sorted = workshops
-        .map(w => ({
+      const sorted = Object.entries(workshops)
+        .map(([id, w]) => ({
+          id,
           ...w,
           distanceKm: haversine(loc.lat, loc.lng, w.lat, w.lng)
         }))
@@ -352,10 +319,20 @@ function findWorkshops() {
       renderWorkshopList(sorted);
     })
     .catch(() => alert("Geocoding failed."));
+};
+
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) *
+    Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) ** 2;
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 }
+
 </script>
 
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB6p5E2vQ-PzafSR7wriDUZRLI1dgtN5o8&callback=initMap" async defer></script>
-
-</body>
-</html>
