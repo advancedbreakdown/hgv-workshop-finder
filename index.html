@@ -20,7 +20,7 @@
       #map { height: calc(100vh - 260px); }
     }
 
-    #panel input, #panel button {
+    #panel input, #panel button, #panel textarea {
       width: 100%; margin-top: 4px; margin-bottom: 6px; padding: 6px;
       box-sizing: border-box; font-size: 14px;
     }
@@ -51,8 +51,21 @@
   <input id="w-name" type="text" placeholder="Workshop name">
   <input id="w-lat" type="text" placeholder="Latitude">
   <input id="w-lng" type="text" placeholder="Longitude">
+
+  <!-- CONTACT FIELDS -->
+  <input id="w-phone-main" type="text" placeholder="Main phone">
+  <input id="w-phone-mobile" type="text" placeholder="Mobile phone">
+  <input id="w-phone-out" type="text" placeholder="Out of hours phone">
+  <input id="w-email" type="text" placeholder="Email address">
+
   <button onclick="saveWorkshop()">Save workshop</button>
   <button onclick="clearWorkshopForm()">Clear form</button>
+
+  <hr>
+
+  <strong>Bulk import workshops</strong>
+  <textarea id="bulk-input" placeholder="Name,lat,lng,main,mobile,out,email per line"></textarea>
+  <button onclick="bulkImport()">Import</button>
 
   <hr>
 
@@ -65,14 +78,10 @@
 <div id="map"></div>
 
 <script>
-const DEFAULT_WORKSHOPS = [
-  { id: 1, name: "Trailer Aid Ltd", lat: 51.916207, lng: -0.661694 },
-  { id: 2, name: "APR Engineering Ltd", lat: 51.907893, lng: -0.667918 },
-  { id: 3, name: "BS Trailer Services", lat: 51.907013, lng: -0.640622 },
-];
+const DEFAULT_WORKSHOPS = [];
 
 let workshops = [];
-let nextId = 4;
+let nextId = 1;
 
 let map;
 let workshopMarkers = [];
@@ -83,14 +92,14 @@ function loadWorkshops() {
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.length) {
+      if (Array.isArray(parsed)) {
         workshops = parsed;
-        nextId = Math.max(...workshops.map(w => w.id)) + 1;
+        nextId = workshops.length ? Math.max(...workshops.map(w => w.id)) + 1 : 1;
         return;
       }
     } catch (e) {}
   }
-  workshops = [...DEFAULT_WORKSHOPS];
+  workshops = [];
 }
 
 function saveWorkshopsToStorage() {
@@ -105,7 +114,6 @@ function initMap() {
     zoom: 6,
   });
 
-  // Start with NO workshops shown
   renderWorkshopMarkers([]);
   renderWorkshopList([]);
 }
@@ -125,6 +133,19 @@ function renderWorkshopMarkers(list) {
       title: w.name,
       icon: "http://maps.google.com/mapfiles/ms/icons/green-dot.png"
     });
+
+    const info = new google.maps.InfoWindow({
+      content: `
+        <strong>${w.name}</strong><br><br>
+        <b>Main:</b> ${w.phoneMain || "N/A"}<br>
+        <b>Mobile:</b> ${w.phoneMobile || "N/A"}<br>
+        <b>Out of hours:</b> ${w.phoneOutHours || "N/A"}<br>
+        <b>Email:</b> ${w.email || "N/A"}<br>
+      `
+    });
+
+    marker.addListener("click", () => info.open(map, marker));
+
     workshopMarkers.push(marker);
   });
 }
@@ -156,10 +177,16 @@ function zoomToWorkshop(id) {
 function editWorkshop(id) {
   const w = workshops.find(x => x.id === id);
   if (!w) return;
+
   document.getElementById("w-id").value = w.id;
   document.getElementById("w-name").value = w.name;
   document.getElementById("w-lat").value = w.lat;
   document.getElementById("w-lng").value = w.lng;
+
+  document.getElementById("w-phone-main").value = w.phoneMain || "";
+  document.getElementById("w-phone-mobile").value = w.phoneMobile || "";
+  document.getElementById("w-phone-out").value = w.phoneOutHours || "";
+  document.getElementById("w-email").value = w.email || "";
 }
 
 function clearWorkshopForm() {
@@ -167,6 +194,10 @@ function clearWorkshopForm() {
   document.getElementById("w-name").value = "";
   document.getElementById("w-lat").value = "";
   document.getElementById("w-lng").value = "";
+  document.getElementById("w-phone-main").value = "";
+  document.getElementById("w-phone-mobile").value = "";
+  document.getElementById("w-phone-out").value = "";
+  document.getElementById("w-email").value = "";
 }
 
 function saveWorkshop() {
@@ -174,6 +205,11 @@ function saveWorkshop() {
   const name = document.getElementById("w-name").value.trim();
   const lat = parseFloat(document.getElementById("w-lat").value.trim());
   const lng = parseFloat(document.getElementById("w-lng").value.trim());
+
+  const phoneMain = document.getElementById("w-phone-main").value.trim();
+  const phoneMobile = document.getElementById("w-phone-mobile").value.trim();
+  const phoneOut = document.getElementById("w-phone-out").value.trim();
+  const email = document.getElementById("w-email").value.trim();
 
   if (!name || isNaN(lat) || isNaN(lng)) {
     alert("Please enter a name, latitude and longitude.");
@@ -184,12 +220,28 @@ function saveWorkshop() {
     const id = parseInt(idVal, 10);
     const idx = workshops.findIndex(w => w.id === id);
     if (idx !== -1) {
-      workshops[idx].name = name;
-      workshops[idx].lat = lat;
-      workshops[idx].lng = lng;
+      workshops[idx] = {
+        ...workshops[idx],
+        name,
+        lat,
+        lng,
+        phoneMain,
+        phoneMobile,
+        phoneOutHours: phoneOut,
+        email
+      };
     }
   } else {
-    workshops.push({ id: nextId++, name, lat, lng });
+    workshops.push({
+      id: nextId++,
+      name,
+      lat,
+      lng,
+      phoneMain,
+      phoneMobile,
+      phoneOutHours: phoneOut,
+      email
+    });
   }
 
   clearWorkshopForm();
@@ -204,9 +256,49 @@ function deleteWorkshop(id) {
 
 function resetToDefaults() {
   if (!confirm("Reset to default workshop list?")) return;
-  workshops = [...DEFAULT_WORKSHOPS];
-  nextId = 4;
+  workshops = [];
+  nextId = 1;
   saveWorkshopsToStorage();
+}
+
+function bulkImport() {
+  const text = document.getElementById("bulk-input").value.trim();
+  if (!text) {
+    alert("Paste some workshop data first.");
+    return;
+  }
+
+  const lines = text.split("\n");
+
+  lines.forEach(line => {
+    const parts = line.split(",");
+    if (parts.length < 3) return;
+
+    const name = parts[0].trim();
+    const lat = parseFloat(parts[1].trim());
+    const lng = parseFloat(parts[2].trim());
+
+    const phoneMain = parts[3] ? parts[3].trim() : "";
+    const phoneMobile = parts[4] ? parts[4].trim() : "";
+    const phoneOut = parts[5] ? parts[5].trim() : "";
+    const email = parts[6] ? parts[6].trim() : "";
+
+    if (!name || isNaN(lat) || isNaN(lng)) return;
+
+    workshops.push({
+      id: nextId++,
+      name,
+      lat,
+      lng,
+      phoneMain,
+      phoneMobile,
+      phoneOutHours: phoneOut,
+      email
+    });
+  });
+
+  saveWorkshopsToStorage();
+  alert("Bulk import complete.");
 }
 
 function haversine(lat1, lon1, lat2, lon2) {
@@ -269,4 +361,3 @@ function findWorkshops() {
 
 </body>
 </html>
-
