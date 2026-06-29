@@ -207,168 +207,22 @@ function refreshWorkshopList() {
   });
 }
 
-// Used for nearest-20 search results
-function renderWorkshopMarkers(list) {
-  workshopMarkers.forEach(m => m.setMap(null));
-  workshopMarkers = [];
-
-  list.forEach(w => {
-    const marker = new google.maps.Marker({
-      position: { lat: w.lat, lng: w.lng },
-      map,
-      title: w.name,
-      icon: "https://maps.google.com/mapfiles/ms/icons/green-dot.png"
-    });
-
-    const info = new google.maps.InfoWindow({
-      content: `
-        <strong>${w.name}</strong><br><br>
-        <b>Main:</b> ${w.phoneMain || "N/A"}<br>
-        <b>Mobile:</b> ${w.phoneMobile || "N/A"}<br>
-        <b>Out of hours:</b> ${w.phoneOutHours || "N/A"}<br>
-        <b>Email:</b> ${w.email || "N/A"}<br>
-        <b>Distance:</b> ${w.distanceKm.toFixed(1)} km<br>
-      `
-    });
-
-    marker.addListener("click", () => info.open(map, marker));
-    workshopMarkers.push(marker);
-  });
-}
-
-function renderWorkshopList(list) {
-  const container = document.getElementById("workshop-list");
-  if (!container) return;
-  container.innerHTML = "";
-
-  list.forEach(w => {
-    const div = document.createElement("div");
-    div.innerHTML = `
-      <strong>${w.name}</strong><br>
-      Lat: ${w.lat}, Lng: ${w.lng}<br>
-      Distance: ${w.distanceKm.toFixed(1)} km<br>
-      <button onclick="zoomToWorkshop('${w.id}')">Zoom</button>
-      <button onclick="editWorkshop('${w.id}')">Edit</button>
-      <button onclick="deleteWorkshop('${w.id}')">Delete</button>
-    `;
-    container.appendChild(div);
-  });
-}
-
-window.zoomToWorkshop = function(id) {
-  const w = workshops[id];
-  if (!w) return;
-  map.setCenter({ lat: w.lat, lng: w.lng });
-  map.setZoom(15);
-};
-
-window.editWorkshop = function(id) {
-  if (!requireAdmin()) return;
-
-  const w = workshops[id];
-  if (!w) return;
-
-  document.getElementById("w-id").value = id;
-  document.getElementById("w-name").value = w.name;
-  document.getElementById("w-lat").value = w.lat;
-  document.getElementById("w-lng").value = w.lng;
-  document.getElementById("w-phone-main").value = w.phoneMain || "";
-  document.getElementById("w-phone-mobile").value = w.phoneMobile || "";
-  document.getElementById("w-phone-out").value = w.phoneOutHours || "";
-  document.getElementById("w-email").value = w.email || "";
-};
-
-window.saveWorkshop = function() {
-  if (!requireAdmin()) return;
-
-  const id = document.getElementById("w-id").value.trim();
-  const name = document.getElementById("w-name").value.trim();
-  const lat = parseFloat(document.getElementById("w-lat").value.trim());
-  const lng = parseFloat(document.getElementById("w-lng").value.trim());
-  const phoneMain = document.getElementById("w-phone-main").value.trim();
-  const phoneMobile = document.getElementById("w-phone-mobile").value.trim();
-  const phoneOut = document.getElementById("w-phone-out").value.trim();
-  const email = document.getElementById("w-email").value.trim();
-
-  if (!name || isNaN(lat) || isNaN(lng)) {
-    alert("Please enter a name, latitude and longitude.");
-    return;
-  }
-
-  const data = { name, lat, lng, phoneMain, phoneMobile, phoneOutHours: phoneOut, email };
-
-  if (id) {
-    update(ref(db, "workshops/" + id), data);
-  } else {
-    const newRef = push(workshopsRef);
-    set(newRef, data);
-  }
-
-  clearWorkshopForm();
-};
-
-window.deleteWorkshop = function(id) {
-  if (!requireAdmin()) return;
-  if (!confirm("Delete this workshop?")) return;
-  remove(ref(db, "workshops/" + id));
-};
-
-window.bulkImport = function() {
-  if (!requireAdmin()) return;
-
-  const text = document.getElementById("bulk-input").value.trim();
-  if (!text) {
-    alert("Paste some workshop data first.");
-    return;
-  }
-
-  const lines = text.split("\n");
-  lines.forEach(line => {
-    const p = line.split(",");
-    if (p.length < 3) return;
-
-    const data = {
-      name: p[0].trim(),
-      lat: parseFloat(p[1]),
-      lng: parseFloat(p[2]),
-      phoneMain: p[3] || "",
-      phoneMobile: p[4] || "",
-      phoneOutHours: p[5] || "",
-      email: p[6] || ""
-    };
-
-    const newRef = push(workshopsRef);
-    set(newRef, data);
-  });
-
-  alert("Bulk import complete.");
-};
-
-window.resetToDefaults = function() {
-  if (!requireAdmin()) return;
-  if (!confirm("Reset ALL workshops?")) return;
-  set(workshopsRef, {});
-};
-
-function clearWorkshopForm() {
-  document.getElementById("w-id").value = "";
-  document.getElementById("w-name").value = "";
-  document.getElementById("w-lat").value = "";
-  document.getElementById("w-lng").value = "";
-  document.getElementById("w-phone-main").value = "";
-  document.getElementById("w-phone-mobile").value = "";
-  document.getElementById("w-phone-out").value = "";
-  document.getElementById("w-email").value = "";
+function formatPostcode(pc) {
+  pc = pc.toUpperCase().replace(/\s+/g, "");
+  if (pc.length < 5) return pc;
+  return pc.slice(0, pc.length - 3) + " " + pc.slice(pc.length - 3);
 }
 
 window.findWorkshops = function() {
-  const postcode = document.getElementById("postcode").value.trim();
-  if (!postcode) {
+  let raw = document.getElementById("postcode").value.trim();
+  if (!raw) {
     alert("Enter a postcode.");
     return;
   }
 
-  fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(postcode)}&region=uk&key=AIzaSyBmS1QFcTI50GEQLlIhTfp-9NgvDapTvmw`)
+  const postcode = formatPostcode(raw);
+
+  fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(postcode)}&components=country:GB&key=AIzaSyBmS1QFcTI50GEQLlIhTfp-9NgvDapTvmw`)
     .then(res => res.json())
     .then(data => {
       if (!data.results || !data.results.length) {
@@ -434,5 +288,3 @@ window.addEventListener("load", () => {
 
 </body>
 </html>
-
-
