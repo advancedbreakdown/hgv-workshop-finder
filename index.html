@@ -207,6 +207,54 @@ function refreshWorkshopList() {
   });
 }
 
+// Used for nearest-20 search results
+function renderWorkshopMarkers(list) {
+  workshopMarkers.forEach(m => m.setMap(null));
+  workshopMarkers = [];
+
+  list.forEach(w => {
+    const marker = new google.maps.Marker({
+      position: { lat: w.lat, lng: w.lng },
+      map,
+      title: w.name,
+      icon: "https://maps.google.com/mapfiles/ms/icons/green-dot.png"
+    });
+
+    const info = new google.maps.InfoWindow({
+      content: `
+        <strong>${w.name}</strong><br><br>
+        <b>Main:</b> ${w.phoneMain || "N/A"}<br>
+        <b>Mobile:</b> ${w.phoneMobile || "N/A"}<br>
+        <b>Out of hours:</b> ${w.phoneOutHours || "N/A"}<br>
+        <b>Email:</b> ${w.email || "N/A"}<br>
+        <b>Distance:</b> ${w.distanceKm.toFixed(1)} km<br>
+      `
+    });
+
+    marker.addListener("click", () => info.open(map, marker));
+    workshopMarkers.push(marker);
+  });
+}
+
+function renderWorkshopList(list) {
+  const container = document.getElementById("workshop-list");
+  if (!container) return;
+  container.innerHTML = "";
+
+  list.forEach(w => {
+    const div = document.createElement("div");
+    div.innerHTML = `
+      <strong>${w.name}</strong><br>
+      Lat: ${w.lat}, Lng: ${w.lng}<br>
+      Distance: ${w.distanceKm.toFixed(1)} km<br>
+      <button onclick="zoomToWorkshop('${w.id}')">Zoom</button>
+      <button onclick="editWorkshop('${w.id}')">Edit</button>
+      <button onclick="deleteWorkshop('${w.id}')">Delete</button>
+    `;
+    container.appendChild(div);
+  });
+}
+
 window.zoomToWorkshop = function(id) {
   const w = workshops[id];
   if (!w) return;
@@ -320,7 +368,7 @@ window.findWorkshops = function() {
     return;
   }
 
-  fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(postcode)}&region=uk&key=AIzaSyAkm-NcybEuigI1PIR0UNk7aeNKLasQEZw`)
+  fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(postcode)}&region=uk&key=AIzaSyBmS1QFcTI50GEQLlIhTfp-9NgvDapTvmw`)
     .then(res => res.json())
     .then(data => {
       if (!data.results || !data.results.length) {
@@ -382,10 +430,9 @@ window.addEventListener("load", () => {
 });
 </script>
 
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAkm-NcybEuigI1PIR0UNk7aeNKLasQEZw" async defer></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBmS1QFcTI50GEQLlIhTfp-9NgvDapTvmw" async defer></script>
 
 </body>
 </html>
-
 
 
