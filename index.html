@@ -39,7 +39,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getDatabase, ref, set, push, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAkm-NcybEuigI1PIR0UNk7aeNKLasQEZw",
+  apiKey: "AIzaSyB6p5E2vQ-PzafSR7wriDUZRLI1dgtN5o8",
   authDomain: "hgv-workshop-finder.firebaseapp.com",
   databaseURL: "https://hgv-workshop-finder-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "hgv-workshop-finder",
@@ -136,7 +136,7 @@ window.findWorkshops = function() {
 
   const formatted = formatPostcode(raw);
 
-  fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(formatted)}&components=country:GB&key=AIzaSyBmS1QFcTI50GEQLlIhTfp-9NgvDapTvmw`)
+  fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(formatted)}&components=country:GB&key=AIzaSyB6p5E2vQ-PzafSR7wriDUZRLI1dgtN5o8`)
     .then(r => r.json())
     .then(d => {
       if (!d.results || !d.results.length) {
@@ -277,7 +277,8 @@ window.addEventListener("load", () => {
 });
 </script>
 
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBmS1QFcTI50GEQLlIhTfp-9NgvDapTvmw" async defer></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB6p5E2vQ-PzafSR7wriDUZRLI1dgtN5o8" async defer></script>
 
 </body>
 </html>
+
