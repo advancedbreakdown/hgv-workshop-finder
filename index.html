@@ -148,8 +148,8 @@ const workshopsRef = ref(db, "workshops");
 
 onValue(workshopsRef, (snapshot) => {
   workshops = snapshot.val() || {};
-  refreshWorkshopList();
-  refreshWorkshopMarkers();
+  refreshWorkshopMarkers(); // show all garages on map
+  clearNearestList();       // nearest 20 only after search
 });
 
 window.initMap = function() {
@@ -159,7 +159,6 @@ window.initMap = function() {
   });
 
   refreshWorkshopMarkers();
-  refreshWorkshopList();
 };
 
 function refreshWorkshopMarkers() {
@@ -189,19 +188,52 @@ function refreshWorkshopMarkers() {
   });
 }
 
-function refreshWorkshopList() {
+function clearNearestList() {
   const container = document.getElementById("workshop-list");
-  if (!container) return;
+  if (container) container.innerHTML = "";
+}
+
+function renderWorkshopMarkers(list) {
+  workshopMarkers.forEach(m => m.setMap(null));
+  workshopMarkers = [];
+
+  list.forEach(w => {
+    const marker = new google.maps.Marker({
+      position: { lat: w.lat, lng: w.lng },
+      map,
+      title: `${w.name} (${w.distanceKm.toFixed(1)} km)`,
+      icon: "https://maps.google.com/mapfiles/ms/icons/green-dot.png"
+    });
+
+    const info = new google.maps.InfoWindow({
+      content: `
+        <strong>${w.name}</strong><br>
+        Distance: ${w.distanceKm.toFixed(1)} km<br><br>
+        <b>Main:</b> ${w.phoneMain || "N/A"}<br>
+        <b>Mobile:</b> ${w.phoneMobile || "N/A"}<br>
+        <b>Out of hours:</b> ${w.phoneOutHours || "N/A"}<br>
+        <b>Email:</b> ${w.email || "N/A"}<br>
+      `
+    });
+
+    marker.addListener("click", () => info.open(map, marker));
+    workshopMarkers.push(marker);
+  });
+}
+
+function renderWorkshopList(list) {
+  const container = document.getElementById("workshop-list");
   container.innerHTML = "";
 
-  Object.entries(workshops).forEach(([id, w]) => {
+  list.forEach(w => {
     const div = document.createElement("div");
     div.innerHTML = `
-      <strong>${w.name}</strong><br>
+      <strong>${w.name}</strong> (${w.distanceKm.toFixed(1)} km)<br>
       Lat: ${w.lat}, Lng: ${w.lng}<br>
-      <button onclick="zoomToWorkshop('${id}')">Zoom</button>
-      <button onclick="editWorkshop('${id}')">Edit</button>
-      <button onclick="deleteWorkshop('${id}')">Delete</button>
+      <button onclick="zoomToWorkshop('${w.id}')">Zoom</button>
+      <button onclick="editWorkshop('${w.id}')">Edit</button>
+      <button onclick="deleteWorkshop('${w.id}')">Delete</button>
+      <hr>
     `;
     container.appendChild(div);
   });
@@ -240,7 +272,7 @@ window.findWorkshops = function() {
         icon: "https://maps.google.com/mapfiles/ms/icons/red-dot.png"
       });
 
-      map.setCenter(loc);
+      map.setCenter(loc);   // X: zoom to postcode
       map.setZoom(11);
 
       const sorted = Object.entries(workshops)
@@ -269,6 +301,108 @@ function haversine(lat1, lon1, lat2, lon2) {
     Math.sin(dLon / 2) ** 2;
   return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 }
+
+window.zoomToWorkshop = function(id) {
+  const w = workshops[id];
+  if (!w || !map) return;
+
+  map.setCenter({ lat: w.lat, lng: w.lng });
+  map.setZoom(13);
+};
+
+window.editWorkshop = function(id) {
+  if (!requireAdmin()) return;
+
+  const w = workshops[id];
+  if (!w) return;
+
+  document.getElementById("w-id").value = id;
+  document.getElementById("w-name").value = w.name || "";
+  document.getElementById("w-lat").value = w.lat || "";
+  document.getElementById("w-lng").value = w.lng || "";
+  document.getElementById("w-phone-main").value = w.phoneMain || "";
+  document.getElementById("w-phone-mobile").value = w.phoneMobile || "";
+  document.getElementById("w-phone-out").value = w.phoneOutHours || "";
+  document.getElementById("w-email").value = w.email || "";
+};
+
+window.deleteWorkshop = function(id) {
+  if (!requireAdmin()) return;
+
+  if (!confirm("Delete this workshop?")) return;
+
+  remove(ref(db, "workshops/" + id))
+    .then(() => alert("Workshop deleted."))
+    .catch(() => alert("Delete failed."));
+};
+
+window.saveWorkshop = function() {
+  if (!requireAdmin()) return;
+
+  const id = document.getElementById("w-id").value.trim();
+  const name = document.getElementById("w-name").value.trim();
+  const lat = parseFloat(document.getElementById("w-lat").value.trim());
+  const lng = parseFloat(document.getElementById("w-lng").value.trim());
+  const phoneMain = document.getElementById("w-phone-main").value.trim();
+  const phoneMobile = document.getElementById("w-phone-mobile").value.trim();
+  const phoneOutHours = document.getElementById("w-phone-out").value.trim();
+  const email = document.getElementById("w-email").value.trim();
+
+  if (!name || isNaN(lat) || isNaN(lng)) {
+    alert("Name, lat and lng are required.");
+    return;
+  }
+
+  const data = { name, lat, lng, phoneMain, phoneMobile, phoneOutHours, email };
+
+  if (id) {
+    update(ref(db, "workshops/" + id), data)
+      .then(() => alert("Workshop updated."))
+      .catch(() => alert("Update failed."));
+  } else {
+    const newRef = push(ref(db, "workshops"));
+    set(newRef, data)
+      .then(() => alert("Workshop added."))
+      .catch(() => alert("Add failed."));
+  }
+};
+
+window.bulkImport = function() {
+  if (!requireAdmin()) return;
+
+  const text = document.getElementById("bulk-input").value.trim();
+  if (!text) {
+    alert("Paste CSV lines first.");
+    return;
+  }
+
+  const lines = text.split("\n");
+  lines.forEach(line => {
+    const parts = line.split(",").map(p => p.trim());
+    if (parts.length < 7) return;
+
+    const [name, latStr, lngStr, phoneMain, phoneMobile, phoneOutHours, email] = parts;
+    const lat = parseFloat(latStr);
+    const lng = parseFloat(lngStr);
+    if (!name || isNaN(lat) || isNaN(lng)) return;
+
+    const data = { name, lat, lng, phoneMain, phoneMobile, phoneOutHours, email };
+    const newRef = push(ref(db, "workshops"));
+    set(newRef, data);
+  });
+
+  alert("Bulk import complete.");
+};
+
+window.resetToDefaults = function() {
+  if (!requireAdmin()) return;
+
+  if (!confirm("Reset ALL workshops? This cannot be undone.")) return;
+
+  set(ref(db, "workshops"), {})
+    .then(() => alert("All workshops reset."))
+    .catch(() => alert("Reset failed."));
+};
 
 window.addEventListener("load", () => {
   if (window.google && window.google.maps) {
