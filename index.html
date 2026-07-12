@@ -3,22 +3,6 @@
 <head>
   <title>HGV Workshop Finder</title>
   <meta charset="UTF-8">
-  <style>
-    #login-overlay {
-      position: fixed; top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(0,0,0,0.6);
-      display: none; justify-content: center; align-items: center;
-      z-index: 2000;
-    }
-    #login-box {
-      background: white; padding: 20px; width: 300px;
-      border-radius: 10px; text-align: center;
-    }
-    #login-box input, #login-box button {
-      width: 100%; padding: 10px; margin-top: 10px;
-    }
-  </style>
 </head>
 
 <body>
@@ -44,26 +28,15 @@
 <input id="w-email" placeholder="Email"><br><br>
 
 <button onclick="saveWorkshop()">Save Workshop</button>
-<button onclick="resetToDefaults()">Reset All Workshops</button>
 
 <hr>
 <h3>Bulk Import</h3>
 <textarea id="bulk-input" style="width:100%;height:120px;" placeholder="name,lat,lng,phoneMain,phoneMobile,phoneOutHours,email"></textarea><br>
 <button onclick="bulkImport()">Bulk Import</button>
 
-<div id="login-overlay">
-  <div id="login-box">
-    <h3>Admin Login Required</h3>
-    <input id="login-email" type="email" placeholder="Email">
-    <input id="login-pass" type="password" placeholder="Password">
-    <button onclick="performLogin()">Login</button>
-  </div>
-</div>
-
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getDatabase, ref, set, push, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAkm-NcybEuigI1PIR0UNk7aeNKLasQEZw",
@@ -75,83 +48,56 @@ const firebaseConfig = {
   appId: "1:540661085613:web:199992f2ad1c4f5cb29d24"
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-const auth = getAuth(app);
+const app  = initializeApp(firebaseConfig);
+const db   = getDatabase(app);
 
-const ADMIN_EMAIL = "breakdown@advancedbreakdownservicesuk.co.uk";
-
-let workshops = {};
-let map;
+let workshops       = {};
+let map             = null;
 let workshopMarkers = [];
 let breakdownMarker = null;
-let userIsAdmin = false;
 
-onAuthStateChanged(auth, user => {
-  userIsAdmin = !!(user && user.email === ADMIN_EMAIL);
-});
-
-function requireAdmin() {
-  if (!userIsAdmin) {
-    document.getElementById("login-overlay").style.display = "flex";
-    return false;
-  }
-  return true;
-}
-
-window.performLogin = function() {
-  const email = document.getElementById("login-email").value.trim();
-  const pass  = document.getElementById("login-pass").value.trim();
-
-  signInWithEmailAndPassword(auth, email, pass)
-    .then(() => {
-      document.getElementById("login-overlay").style.display = "none";
-      alert("Logged in as admin.");
-    })
-    .catch(() => alert("Login failed."));
-};
-
-onValue(ref(db, "workshops"), snap => {
-  workshops = snap.val() || {};
-  drawAllWorkshops();
-  document.getElementById("workshop-list").innerHTML = "";
-});
-
+// --- map init ---
 window.initMap = function() {
   map = new google.maps.Map(
     document.getElementById("map"),
     { center: { lat: 54.5, lng: -3 }, zoom: 6 }
   );
-  drawAllWorkshops();
+
+  onValue(ref(db, "workshops"), snap => {
+    workshops = snap.val() || {};
+    clearWorkshopMarkers();
+    document.getElementById("workshop-list").innerHTML = "";
+  });
 };
 
-function drawAllWorkshops() {
+function clearWorkshopMarkers() {
   workshopMarkers.forEach(m => m.setMap(null));
   workshopMarkers = [];
-
-  Object.entries(workshops).forEach(([id, w]) => {
-    const marker = new google.maps.Marker({
-      position: { lat: w.lat, lng: w.lng },
-      map,
-      title: w.name,
-      icon: "https://maps.google.com/mapfiles/ms/icons/green-dot.png"
-    });
-
-    marker.addListener("click", () => {
-      new google.maps.InfoWindow({
-        content: `<strong>${w.name}</strong><br>${w.phoneMain || ""}`
-      }).open(map, marker);
-    });
-
-    workshopMarkers.push(marker);
-  });
 }
 
+// --- postcode + distance ---
+function formatPostcode(pc) {
+  pc = pc.toUpperCase().replace(/\s+/g, "");
+  return pc.length < 5 ? pc : pc.slice(0, pc.length - 3) + " " + pc.slice(pc.length - 3);
+}
+
+function haversine(aLat, aLng, bLat, bLng) {
+  const R = 6371;
+  const dLat = (bLat - aLat) * Math.PI / 180;
+  const dLng = (bLng - aLng) * Math.PI / 180;
+  const A =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(aLat * Math.PI / 180) *
+    Math.cos(bLat * Math.PI / 180) *
+    Math.sin(dLng / 2) ** 2;
+  return R * (2 * Math.atan2(Math.sqrt(A), Math.sqrt(1 - A)));
+}
+
+// --- nearest list + green pins ---
 function renderNearest(list) {
   const listDiv = document.getElementById("workshop-list");
 
-  workshopMarkers.forEach(m => m.setMap(null));
-  workshopMarkers = [];
+  clearWorkshopMarkers();
   listDiv.innerHTML = "";
 
   list.forEach(w => {
@@ -180,11 +126,7 @@ function renderNearest(list) {
   });
 }
 
-function formatPostcode(pc) {
-  pc = pc.toUpperCase().replace(/\s+/g, "");
-  return pc.length < 5 ? pc : pc.slice(0, pc.length - 3) + " " + pc.slice(pc.length - 3);
-}
-
+// --- public functions ---
 window.findWorkshops = function() {
   const raw = document.getElementById("postcode").value.trim();
   if (!raw) {
@@ -197,13 +139,14 @@ window.findWorkshops = function() {
   fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(formatted)}&components=country:GB&key=AIzaSyBmS1QFcTI50GEQLlIhTfp-9NgvDapTvmw`)
     .then(r => r.json())
     .then(d => {
-      if (!d.results.length) {
+      if (!d.results || !d.results.length) {
         alert("Postcode not found.");
         return;
       }
 
       const loc = d.results[0].geometry.location;
 
+      // red breakdown pin
       if (breakdownMarker) breakdownMarker.setMap(null);
       breakdownMarker = new google.maps.Marker({
         position: loc,
@@ -214,6 +157,13 @@ window.findWorkshops = function() {
 
       map.setCenter(loc);
       map.setZoom(11);
+
+      if (!workshops || !Object.keys(workshops).length) {
+        alert("No workshops in database.");
+        clearWorkshopMarkers();
+        document.getElementById("workshop-list").innerHTML = "";
+        return;
+      }
 
       const nearest = Object.entries(workshops)
         .map(([id, w]) => ({
@@ -229,18 +179,6 @@ window.findWorkshops = function() {
     .catch(() => alert("Geocoding failed."));
 };
 
-function haversine(aLat, aLng, bLat, bLng) {
-  const R = 6371;
-  const dLat = (bLat - aLat) * Math.PI / 180;
-  const dLng = (bLng - aLng) * Math.PI / 180;
-  const A =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(aLat * Math.PI / 180) *
-    Math.cos(bLat * Math.PI / 180) *
-    Math.sin(dLng / 2) ** 2;
-  return R * (2 * Math.atan2(Math.sqrt(A), Math.sqrt(1 - A)));
-}
-
 window.zoomToWorkshop = id => {
   const w = workshops[id];
   if (!w || !map) return;
@@ -249,7 +187,6 @@ window.zoomToWorkshop = id => {
 };
 
 window.editWorkshop = id => {
-  if (!requireAdmin()) return;
   const w = workshops[id];
   if (!w) return;
 
@@ -264,15 +201,12 @@ window.editWorkshop = id => {
 };
 
 window.deleteWorkshop = id => {
-  if (!requireAdmin()) return;
   if (!confirm("Delete workshop?")) return;
   remove(ref(db, "workshops/" + id))
     .catch(() => alert("Delete failed."));
 };
 
 window.saveWorkshop = function() {
-  if (!requireAdmin()) return;
-
   const id   = document.getElementById("w-id").value.trim();
   const name = document.getElementById("w-name").value.trim();
   const lat  = parseFloat(document.getElementById("w-lat").value.trim());
@@ -301,8 +235,6 @@ window.saveWorkshop = function() {
 };
 
 window.bulkImport = function() {
-  if (!requireAdmin()) return;
-
   const text = document.getElementById("bulk-input").value.trim();
   if (!text) {
     alert("Paste CSV lines first.");
@@ -330,15 +262,7 @@ window.bulkImport = function() {
   alert("Bulk import complete.");
 };
 
-window.resetToDefaults = function() {
-  if (!requireAdmin()) return;
-  if (!confirm("Reset ALL workshops?")) return;
-
-  set(ref(db, "workshops"), {})
-    .then(() => alert("All workshops reset."))
-    .catch(() => alert("Reset failed."));
-};
-
+// wait for Maps JS
 window.addEventListener("load", () => {
   if (window.google && window.google.maps) {
     initMap();
@@ -357,4 +281,3 @@ window.addEventListener("load", () => {
 
 </body>
 </html>
-
