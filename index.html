@@ -110,7 +110,15 @@ function renderNearest(list) {
 
     marker.addListener("click", () => {
       new google.maps.InfoWindow({
-        content: `<strong>${w.name}</strong><br>${w.distanceKm.toFixed(1)} km`
+        content: `
+          <strong>${w.name}</strong><br>
+          ${w.distanceKm.toFixed(1)} km from breakdown<br><br>
+
+          <strong>Main:</strong> ${w.phoneMain || "N/A"}<br>
+          <strong>Mobile:</strong> ${w.phoneMobile || "N/A"}<br>
+          <strong>Out of Hours:</strong> ${w.phoneOutHours || "N/A"}<br>
+          <strong>Email:</strong> ${w.email || "N/A"}
+        `
       }).open(map, marker);
     });
 
@@ -281,4 +289,5 @@ window.addEventListener("load", () => {
 
 </body>
 </html>
+
 
