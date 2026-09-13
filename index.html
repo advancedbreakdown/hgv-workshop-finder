@@ -1,11 +1,4 @@
-<script>
-  const correctPassword = "monkey1976";
 
-  const userPassword = prompt("Enter password to access the HGV Workshop Finder:");
-
-  if (userPassword !== correctPassword) {
-    document.body.innerHTML = "<h2 style='font-family: Arial; text-align: center; margin-top: 40px;'>Access Denied</h2>";
-    throw new Error("Access denied");
   }
 </script>
 
@@ -297,7 +290,15 @@ window.addEventListener("load", () => {
 </script>
 
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB6p5E2vQ-PzafSR7wriDUZRLI1dgtN5o8" async defer></script>
+<script>
+  const correctPassword = "monkey1976";
 
+  const userPassword = prompt("Enter password to access the HGV Workshop Finder:");
+
+  if (userPassword !== correctPassword) {
+    document.body.innerHTML = "<h2 style='font-family: Arial; text-align: center; margin-top: 40px;'>Access Denied</h2>";
+    throw new Error("Access denied");
+  }
 </body>
 </html>
 
